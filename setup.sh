@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# MT5 + noVNC Interactive Deployment Script
+# MT5 + noVNC Professional Deployment Script (Hardened Version)
 # ==============================================================================
 set -e
 
@@ -15,7 +15,7 @@ echo "--------------------------------------------------------"
 echo "Select deployment mode:"
 echo "1) Host (Docker Compose - Recommended)"
 echo "2) Container (Manual Install - Advanced)"
-read -p "Choice [1-2]: " choice
+read -p "Choice [1-2]:, " choice
 
 case $choice in
     1)
@@ -44,23 +44,34 @@ case $choice in
 
         export DEBIAN_FRONTEND=noninteractive
         dpkg --add-architecture i386
-        apt-get update
-        apt-get install -y -o Dpkg::Options::="--force-confdef" \
+        apt-get update || warn "Apt update failed, attempting to proceed..."
+        apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
             wine64 wine32 xserver-xorg openbox ffmpeg curl wget sudo net-tools novnc websockify tigervnc-standalone-server
         
         if ! id -u abc >/dev/null 2>&1; then
             useradd -m -s /bin/bash abc
-            echo "abc ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+            # Ensure sudoers is configured correctly for user abc
+            echo "abc ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/abc
+            chmod 440 /etc/sudoers.d/abc
         fi
         
-        sudo -u abc vncpasswd -f <<< "password"
+        # Set VNC password using runuser to avoid sudoers issues in minimal containers
+        runuser -u abc -- bash -c "vncpasswd -f <<< 'password'"
         
-        # Setup VNC start script
+        # Setup VNC start script with "Clean Sweep" logic
         cat <<EOF > /home/abc/start_vnc.sh
 #!/bin/bash
+# --- Clean Sweep: Kill existing processes to prevent port clashes ---
+pkill -f websockify || true
 vncserver -kill :1 2>/dev/null
+
+# Start VNC server
 vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None
+
+# Start noVNC proxy
 websockify -p 3000 --web /usr/share/novnc localhost:5901 &
+
+# Start Window Manager
 DISPLAY=:1 openbox-session &
 
 # Auto-Launch MT5 if binary exists
@@ -73,10 +84,13 @@ fi
 tail -f ~/.vnc/*.log
 EOF
         chmod +x /home/abc/start_vnc.sh
+        
+        # Final Permission Fix: Ensure all files are owned by abc
         chown -R abc:abc /home/abc/
         
         log "Setup complete. Launching everything automatically..."
-        sudo -u abc /home/abc/start_vnc.sh &
+        # Use runuser for a guaranteed launch without sudoers dependency
+        runuser -u abc -- /home/abc/start_vnc.sh &
         log "VNC, noVNC, and MT5 are now active. Access via port 3000."
         ;;
     *)
