@@ -45,21 +45,29 @@ case $choice in
         
         sudo -u abc vncpasswd -f <<< "password"
         
-        # Setup VNC start script
+        # Setup VNC start script (now includes auto-launch of MT5)
         cat <<EOF > /home/abc/start_vnc.sh
 #!/bin/bash
 vncserver -kill :1 2>/dev/null
 vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None
 websockify -p 3000 --web /usr/share/novnc localhost:5901 &
 DISPLAY=:1 openbox-session &
+
+# Auto-Launch MT5 if binary exists
+MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
+if [ -f "\$MT5_PATH" ]; then
+    echo "🚀 Launching MetaTrader 5..."
+    DISPLAY=:1 wine "\$MT5_PATH" &
+fi
+
 tail -f ~/.vnc/*.log
 EOF
         chmod +x /home/abc/start_vnc.sh
         chown -R abc:abc /home/abc/
         
-        log "Setup complete. Launching services automatically..."
+        log "Setup complete. Launching everything automatically..."
         sudo -u abc /home/abc/start_vnc.sh &
-        log "VNC and noVNC are now active. Access via port 3000."
+        log "VNC, noVNC, and MT5 are now active. Access via port 3000."
         ;;
     *)
         err "Invalid selection."
