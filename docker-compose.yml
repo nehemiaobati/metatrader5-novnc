@@ -1,0 +1,13 @@
+services:
+  mt5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mt5-vnc
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./mt5-data/.wine:/home/abc/.wine
+      - ./mt5-data/audio:/home/abc/audio
+    environment:
+      - DISPLAY=:1
