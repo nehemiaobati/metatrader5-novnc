@@ -11,7 +11,7 @@ err() { echo -e "\033[0;31m[ERROR]\033[0m $1"; exit 1; }
 
 echo "--------------------------------------------------------"
 echo "  MT5 + noVNC Deployment Manager"
-echo, "--------------------------------------------------------"
+echo "--------------------------------------------------------"
 echo "Select deployment mode:"
 echo "1) Host (Docker Compose - Recommended)"
 echo "2) Container (Manual Install - Advanced)"
