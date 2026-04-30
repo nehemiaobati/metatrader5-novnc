@@ -1,0 +1,26 @@
+# MetaTrader 5 - noVNC Gitignore
+
+# --- Application Data ---
+# Ignore the entire data directory to prevent uploading private MT5 configs, 
+# accounts, and large binary files to the public repository.
+mt5-data/
+.wine/
+
+# --- Environment & Secrets ---
+# Ignore environment files containing API keys, passwords, or system secrets.
+.env
+*.env
+
+# --- Logs & Temporary Files ---
+# Ignore all log files and temporary system files.
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# --- OS / Tool Specifics ---
+# Ignore temporary folders created by the OS or tools.
+.cache/
+.dbus/
+.local/
