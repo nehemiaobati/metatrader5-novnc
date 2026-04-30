@@ -56,7 +56,10 @@ tail -f ~/.vnc/*.log
 EOF
         chmod +x /home/abc/start_vnc.sh
         chown -R abc:abc /home/abc/
-        log "Setup complete. Run 'sudo -u abc /home/abc/start_vnc.sh'"
+        
+        log "Setup complete. Launching services automatically..."
+        sudo -u abc /home/abc/start_vnc.sh &
+        log "VNC and noVNC are now active. Access via port 3000."
         ;;
     *)
         err "Invalid selection."
