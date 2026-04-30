@@ -11,7 +11,7 @@ err() { echo -e "\033[0;31m[ERROR]\033[0m $1"; exit 1; }
 
 echo "--------------------------------------------------------"
 echo "  MT5 + noVNC Deployment Manager"
-echo "--------------------------------------------------------"
+echo, "--------------------------------------------------------"
 echo "Select deployment mode:"
 echo "1) Host (Docker Compose - Recommended)"
 echo "2) Container (Manual Install - Advanced)"
@@ -24,7 +24,10 @@ case $choice in
         if [ ! -f "docker-compose.yml" ]; then err "docker-compose.yml not found."; fi
         
         read -p "Create MT5 data directory at ~/mt5-data? (y/n): " confirm
-        if [ "$confirm" == "y" ]; then mkdir -p ~/mt5-data; fi
+        if [ "$confirm" == "y" ]; then 
+            mkdir -p ~/mt5-data
+            log "Directory created at ~/mt5-data."
+        fi
 
         log "Building and starting container..."
         docker compose up -d --build
@@ -32,6 +35,13 @@ case $choice in
         ;;
     2)
         log "Selected: CONTAINER mode. Performing manual installation..."
+        
+        read -p "Create MT5 data directory at /home/abc/mt5-data? (y/n): " confirm
+        if [ "$confirm" == "y" ]; then
+            mkdir -p /home/abc/mt5-data
+            log "Directory created at /home/abc/mt5-data."
+        fi
+
         export DEBIAN_FRONTEND=noninteractive
         dpkg --add-architecture i386
         apt-get update
@@ -45,7 +55,7 @@ case $choice in
         
         sudo -u abc vncpasswd -f <<< "password"
         
-        # Setup VNC start script (now includes auto-launch of MT5)
+        # Setup VNC start script
         cat <<EOF > /home/abc/start_vnc.sh
 #!/bin/bash
 vncserver -kill :1 2>/dev/null
