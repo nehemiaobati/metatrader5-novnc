@@ -47,6 +47,7 @@ setup_user() {
 create_start_script() {
     cat <<'EOF' > "$START_SCRIPT"
 #!/bin/bash
+# --- Service Launch: Robust & Isolated ---
 export DISPLAY=:1
 export USER=abc
 export HOME=/home/abc
@@ -55,27 +56,23 @@ export WINEPREFIX=/home/abc/.wine
 # 1. Clean service state
 pkill -f websockify || true
 vncserver -kill :1 2>/dev/null || true
-rm -rf /tmp/.X11-unix/X1 || true
+rm -rf /tmp/.X11-unix/X1 /tmp/vnc-server-*
 
-# 2. Launch VNC
-vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None
+# 2. Launch VNC with authentication bypass
+vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE
 
 # 3. Launch noVNC
 websockify 3000 --web /usr/share/novnc localhost:5901 &
 openbox-session &
 
-# 4. Provision MT5 if missing
+# 4. Provision/Launch MT5
 MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
 if [ ! -f "$MT5_PATH" ]; then
-    echo "[INFO] Binary not found. Initializing fresh MT5 installation..."
+    echo "[INFO] Provisioning MT5..."
     wineboot -u
     wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe -O /tmp/mt5setup.exe
     wine /tmp/mt5setup.exe /auto /silent
-else
-    echo "[INFO] Existing MT5 binary detected. Skipping installation."
 fi
-
-# 5. Launch MT5
 [ -f "$MT5_PATH" ] && wine "$MT5_PATH" &
 
 tail -f /home/abc/.vnc/*.log
