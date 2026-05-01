@@ -74,7 +74,8 @@ deploy_container() {
     chmod +x "$RUNTIME_SCRIPT"
     
     # Set VNC password
-    runuser -u "$USER_NAME" -- bash -c "mkdir -p ~/.vnc && vncpasswd -f <<< 'password' > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd"
+    # Setup audio directory for streaming
+    runuser -u "$USER_NAME" -- bash -c "mkdir -p ~/.vnc && vncpasswd -f <<< 'password' > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd && mkdir -p ~/audio"
     
     chown -R "$USER_NAME":"$USER_NAME" /home/"$USER_NAME"/
     runuser -u "$USER_NAME" -- "$RUNTIME_SCRIPT" > /dev/null 2>&1 &
