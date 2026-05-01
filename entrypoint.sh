@@ -5,10 +5,10 @@
 vncserver -kill :1 2>/dev/null
 
 # 2. Start VNC server
-vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None
+vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None --I-KNOW-THIS-IS-INSECURE
 
 # 3. Bridge VNC (Port 5901) to Web (Port 3000) via noVNC
-websockify -p 3000 --web /usr/share/novnc localhost:5901 &
+websockify 3000 --web /usr/share/novnc localhost:5901 &
 
 # 4. Start the Window Manager
 DISPLAY=:1 openbox-session &
