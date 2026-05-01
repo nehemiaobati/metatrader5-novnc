@@ -50,7 +50,11 @@ install_dependencies() {
     dpkg --add-architecture i386
     apt-get update -qq
     apt-get install -y -q -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-        wine64 wine32 xserver-xorg openbox ffmpeg curl wget sudo net-tools novnc websockify tigervnc-standalone-server
+        wine64 wine32 xserver-xorg openbox ffmpeg curl wget sudo net-tools tigervnc-standalone-server websockify
+    
+    # Download latest noVNC to ensure UI compatibility
+    mkdir -p /usr/share/novnc
+    wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz | tar -xz -C /usr/share/novnc --strip-components=1
 }
 
 setup_user() {
