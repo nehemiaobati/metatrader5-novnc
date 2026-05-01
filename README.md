@@ -6,34 +6,28 @@ This repository provides a professional, automated solution for running MetaTrad
 - **Environment**: Optimized Ubuntu 22.04 base.
 - **Desktop**: Lightweight `Openbox` Window Manager.
 - **Access**: `TigerVNC` bridged to web via `noVNC` (Port 3000).
-- **Deployment**: `setup.sh` handles both Docker-based (host) and manual (container) installations.
+- **Deployment**: `setup.sh` provides a modular, automated interface for Host or Container deployment.
 
 ## 🚀 Usage
 
+Run the deployment script and choose your preferred method:
+```bash
+bash setup.sh
+```
+
 ### 1. Host Deployment (Recommended)
-This method is fully automated and recommended for permanent trading environments.
+Uses Docker Compose for permanent, scalable trading environments.
+*   **Requirement**: Docker installed.
+*   **Workflow**: Creates/verifies a local `~/mt5-data` directory and builds the container.
 
-\`\`\`bash
-git clone https://github.com/nehemiaobati/metatrader5-novnc.git
-cd metatrader5-novnc
-bash setup.sh
-\`\`\`
-*The script will automatically create the \`~/mt5-data\` directory, build the image, and start the container.*
-
-### 2. Manual Container Deployment
-Use this method only if you are already inside a container and want a quick setup.
-\`\`\`bash
-git clone https://github.com/nehemiaobati/metatrader5-novnc.git
-cd metatrader5-novnc
-bash setup.sh
-\`\`\`
-*The script will automatically install all dependencies and launch the VNC services.*
+### 2. Manual Container Deployment (Advanced)
+Installs and configures all required services directly inside a running container.
+*   **Workflow**: Handles dependency installation, user management, and service orchestration automatically.
 
 ## 📂 Data Management
-Your MT5 data is mapped to the \`mt5-data\` directory. 
-- **Important**: To persist your trading configuration, place your existing \`.wine\` folder into \`mt5-data/\`.
-- The system expects: \`mt5-data/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe\`
+Your MT5 configuration is mapped to the `mt5-data` directory. 
+- **Persistence**: For existing environments, place your `.wine` folder into `mt5-data/`.
+- **Initialization**: If the environment is clean, the system guides you to initialize the wine environment and install the MT5 binary via VNC.
 
 ## 🛡️ Security
-- **Default VNC Password**: \`password\` (Change via \`vncpasswd\` inside).
-- **Port 3000**: Used for noVNC browser access. Ensure this port is open on your firewall.
+- **Port 3000**: Used for noVNC browser access (`http://<your-ip>:3000/vnc.html`).
