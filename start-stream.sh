@@ -18,7 +18,7 @@ sleep 1
 # Start streaming: Loops the mp3 file and captures the screen
 # -u abc: Run as the VNC user to access X11
 # xhost +: Disable access control to allow FFmpeg to capture the screen
-sudo docker exec -u abc -d mt5-//workbench bash -c "export DISPLAY=:1 && xhost + && ffmpeg \
+sudo docker exec -u abc -d mt5-workbench bash -c "export DISPLAY=:1 && xhost + && ffmpeg \
 -f x11grab -framerate 24 -video_size 1280x720 -i :1.0 \
 -stream_loop -1 -i /home/abc/audio/BackgroundNocopyright.mp3 \
 -c:v libx264 -preset superfast -tune zerolatency -pix_fmt yuv420p \
