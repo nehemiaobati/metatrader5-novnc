@@ -15,10 +15,75 @@ err() { echo -e "\033[0;31m[ERROR]\033[0m $1"; exit 1; }
 
 confirm() {
     read -p "$1 (y/n): " choice
-    [[ "$choice" =~ ^[Yy]$ ]]
+    if [[ "$choice" =~ ^[Yy]$ ]]; then
+        return 0
+    else
+        log "User opted NOT to create/overwrite data directory."
+        return 1
+    fi
 }
 
-# --- Core Logic Functions ---
+# --- Logic Modules ---
+install_dependencies() {
+    log "Updating and installing core dependencies..."
+    export DEBIAN_FRONTEND=noninteractive
+    dpkg --add-architecture i386
+    apt-get update -qq
+    apt-get install -y -q -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+        wine64 wine32 xserver-xorg openbox ffmpeg curl wget sudo net-tools tigervnc-standalone-server websockify
+    
+    mkdir -p /usr/share/novnc
+    wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz | tar -xz -C /usr/share/novnc --strip-components=1
+}
+
+setup_user() {
+    if ! id -u "$USER_NAME" >/dev/null 2>&1; then
+        useradd -m -s /bin/bash "$USER_NAME"
+        echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USER_NAME"
+        chmod 440 "/etc/sudoers.d/$USER_NAME"
+    fi
+}
+
+create_start_script() {
+    cat <<'EOF' > "$START_SCRIPT"
+#!/bin/bash
+export DISPLAY=:1
+export USER=abc
+export HOME=/home/abc
+export WINEPREFIX=/home/abc/.wine
+
+# 1. Clean service state
+pkill -f websockify || true
+vncserver -kill :1 2>/dev/null || true
+rm -rf /tmp/.X11-unix/X1 || true
+
+# 2. Launch VNC
+vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None
+
+# 3. Launch noVNC
+websockify 3000 --web /usr/share/novnc localhost:5901 &
+openbox-session &
+
+# 4. Provision MT5 if missing
+MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
+if [ ! -f "$MT5_PATH" ]; then
+    echo "[INFO] Binary not found. Initializing fresh MT5 installation..."
+    wineboot -u
+    wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe -O /tmp/mt5setup.exe
+    wine /tmp/mt5setup.exe /auto /silent
+else
+    echo "[INFO] Existing MT5 binary detected. Skipping installation."
+fi
+
+# 5. Launch MT5
+[ -f "$MT5_PATH" ] && wine "$MT5_PATH" &
+
+tail -f /home/abc/.vnc/*.log
+EOF
+    chmod +x "$START_SCRIPT"
+}
+
+# --- Deployment Modes ---
 deploy_host() {
     log "Selected: HOST mode."
     [[ -f "docker-compose.yml" ]] || err "docker-compose.yml not found."
@@ -32,79 +97,20 @@ deploy_host() {
 
 deploy_container() {
     log "Selected: CONTAINER mode."
-    if confirm "Create/Verify MT5 data directory at $DATA_DIR?"; then
+    
+    if confirm "Initialize MT5 data directory at $DATA_DIR?"; then
         mkdir -p "$DATA_DIR"
+    else
+        log "Continuing with existing container data environment."
     fi
 
     install_dependencies
     setup_user
-    setup_vnc_auth
+    runuser -u "$USER_NAME" -- bash -c "mkdir -p /home/$USER_NAME/.vnc && vncpasswd -f <<< 'password' > /home/$USER_NAME/.vnc/passwd && chmod 600 /home/$USER_NAME/.vnc/passwd"
     create_start_script
     
     chown -R "$USER_NAME":"$USER_NAME" /home/"$USER_NAME"/
     runuser -u "$USER_NAME" -- "$START_SCRIPT" > /dev/null 2>&1 &
-}
-
-install_dependencies() {
-    export DEBIAN_FRONTEND=noninteractive
-    dpkg --add-architecture i386
-    apt-get update -qq
-    apt-get install -y -q -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-        wine64 wine32 xserver-xorg openbox ffmpeg curl wget sudo net-tools tigervnc-standalone-server websockify
-    
-    # Download latest noVNC to ensure UI compatibility
-    mkdir -p /usr/share/novnc
-    wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz | tar -xz -C /usr/share/novnc --strip-components=1
-}
-
-setup_user() {
-    if ! id -u "$USER_NAME" >/dev/null 2>&1; then
-        useradd -m -s /bin/bash "$USER_NAME"
-        echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USER_NAME"
-        chmod 440 "/etc/sudoers.d/$USER_NAME"
-    fi
-}
-
-setup_vnc_auth() {
-    runuser -u "$USER_NAME" -- bash -c "mkdir -p /home/$USER_NAME/.vnc && vncpasswd -f <<< 'password' > /home/$USER_NAME/.vnc/passwd && chmod 600 /home/$USER_NAME/.vnc/passwd"
-}
-create_start_script() {
-    cat <<'EOF' > "$START_SCRIPT"
-#!/bin/bash
-# --- Automated MT5 Provisioning ---
-export DISPLAY=:1
-export USER=abc
-export HOME=/home/abc
-export WINEPREFIX=/home/abc/.wine
-
-pkill -f websockify || true
-vncserver -kill :1 2>/dev/null || true
-rm -rf /tmp/.X11-unix/X1 || true
-
-vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None
-websockify 3000 --web /usr/share/novnc localhost:5901 &
-openbox-session &
-
-# Path checked in the standard Wine prefix
-MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
-
-# If binary is missing, attempt silent install without overwriting existing data
-if [ ! -f "$MT5_PATH" ]; then
-    echo "Binary not found. Preparing Wine environment..."
-    wineboot -u
-    if [ ! -f "/tmp/mt5setup.exe" ]; then
-        wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe -O /tmp/mt5setup.exe
-    fi
-    echo "Installing MT5 silently..."
-    wine /tmp/mt5setup.exe /auto /silent
-fi
-
-# Launch MT5
-[ -f "$MT5_PATH" ] && wine "$MT5_PATH" &
-
-tail -f /home/abc/.vnc/*.log
-EOF
-    chmod +x "$START_SCRIPT"
 }
 
 # --- Main Entry ---
