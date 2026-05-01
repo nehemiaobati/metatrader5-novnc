@@ -26,6 +26,7 @@ vncserver -kill :1 2>/dev/null || true
 rm -rf /tmp/.X11-unix/X1 /tmp/vnc-server-*
 
 # 2. VNC Server: The core display layer
+# Alternative (Insecure): vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE
 log "Starting VNC Server..."
 vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes VncAuth
 
