@@ -19,10 +19,10 @@ sleep 1
 # -u abc: Run as the VNC user to access X11
 # xhost +: Disable access control to allow FFmpeg to capture the screen
 sudo docker exec -u abc -d mt5-workbench bash -c "export DISPLAY=:1 && xhost + && ffmpeg \
--f x11grab -framerate 24 -video_size 1280x720 -i :1.0 \
+-f x11grab -framerate 24 -video_size 1920x1080 -i :1.0 \
 -stream_loop -1 -i /home/abc/audio/BackgroundNocopyright.mp3 \
--c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p \
--b:v 2500k -maxrate 2500k -bufsize 5000k -g 48 \
+-c:v libx264 -preset superfast -tune zerolatency -pix_fmt yuv420p \
+-b:v 4500k -maxrate 4500k -bufsize 9000k -g 48 \
 -c:a aac -b:a 128k -ar 44100 \
 -f flv rtmp://a.rtmp.youtube.com/live2/$STREAM_KEY 2>>/tmp/ffmpeg.log"
 
