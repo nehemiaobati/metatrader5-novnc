@@ -77,7 +77,7 @@ Place your background music file at: `~/mt5-vnc/audio/BackgroundNocopyright.mp3`
 
 ### "Failed to connect to server" (noVNC)
 If you see the noVNC page but cannot connect:
-1. **X11 Authorization**: Ensure `xhost +` has been executed inside the container. The updated `start-stream.sh` and `entrypoint.sh` handle this automatically.
+1. **X11 Authorization**: Ensure `xhost +` has been executed inside the container. The `start-stream.sh` and `entrypoint.sh` handle this automatically.
 2. **Browser Cache**: Clear browser cache or try Incognito mode. Chrome extensions can sometimes interfere with the `ui.js` event listeners.
 
 ### MT5 Not Launching
