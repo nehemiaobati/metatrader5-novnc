@@ -1,13 +1,14 @@
 #!/bin/bash
 # ==============================================================================
-# MT5 + noVNC Professional Deployment Script
+# MT5 + noVNC Deployment Manager
+# Role: Environment Provisioning & Orchestration
 # ==============================================================================
 set -e
 
 # --- Configuration ---
 USER_NAME="abc"
 DATA_DIR="/home/$USER_NAME/mt5-data"
-START_SCRIPT="/home/$USER_NAME/start_vnc.sh"
+RUNTIME_SCRIPT="/home/$USER_NAME/start_vnc.sh"
 
 # --- Utility Functions ---
 log() { echo -e "\033[0;32m[INFO]\033[0m $1"; }
@@ -25,7 +26,7 @@ confirm() {
 
 # --- Logic Modules ---
 install_dependencies() {
-    log "Updating and installing core dependencies..."
+    log "Installing core dependencies..."
     export DEBIAN_FRONTEND=noninteractive
     dpkg --add-architecture i386
     apt-get update -qq
@@ -39,51 +40,15 @@ install_dependencies() {
 
 setup_user() {
     if ! id -u "$USER_NAME" >/dev/null 2>&1; then
+        log "Creating user $USER_NAME..."
         useradd -m -s /bin/bash "$USER_NAME"
         echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USER_NAME"
         chmod 440 "/etc/sudoers.d/$USER_NAME"
     fi
 }
 
-create_start_script() {
-    cat <<'EOF' > "$START_SCRIPT"
-#!/bin/bash
-# --- Service Launch: Robust & Isolated ---
-export DISPLAY=:1
-export USER=abc
-export HOME=/home/abc
-export WINEPREFIX=/home/abc/.wine
-
-# 1. Clean service state
-pkill -f websockify || true
-vncserver -kill :1 2>/dev/null || true
-rm -rf /tmp/.X11-unix/X1 /tmp/vnc-server-*
-
-# 2. Launch VNC with authentication bypass
-vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE
-
-# 3. Launch noVNC
-websockify 3000 --web /usr/share/novnc localhost:5901 &
-openbox-session &
-
-# 4. Provision/Launch MT5
-MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
-if [ ! -f "$MT5_PATH" ]; then
-    echo "[INFO] Provisioning MT5..."
-    wineboot -u
-    wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe -O /tmp/mt5setup.exe
-    wine /tmp/mt5setup.exe /auto /silent
-fi
-[ -f "$MT5_PATH" ] && wine "$MT5_PATH" &
-
-tail -f /home/abc/.vnc/*.log
-EOF
-    chmod +x "$START_SCRIPT"
-}
-
-# --- Deployment Modes ---
 deploy_host() {
-    log "Selected: HOST mode."
+    log "Selected: HOST mode (Docker Compose)."
     [[ -f "docker-compose.yml" ]] || err "docker-compose.yml not found."
     
     if confirm "Create/Verify MT5 data directory at ~/mt5-data?"; then
@@ -94,21 +59,25 @@ deploy_host() {
 }
 
 deploy_container() {
-    log "Selected: CONTAINER mode."
+    log "Selected: CONTAINER mode (Manual Install)."
     
     if confirm "Initialize MT5 data directory at $DATA_DIR?"; then
         mkdir -p "$DATA_DIR"
-    else
-        log "Continuing with existing container data environment."
     fi
 
     install_dependencies
     setup_user
-    runuser -u "$USER_NAME" -- bash -c "mkdir -p /home/$USER_NAME/.vnc && vncpasswd -f <<< 'password' > /home/$USER_NAME/.vnc/passwd && chmod 600 /home/$USER_NAME/.vnc/passwd"
-    create_start_script
+    
+    # Simple: Copy the unified runtime script instead of regenerating it
+    log "Deploying runtime manager..."
+    cp entrypoint.sh "$RUNTIME_SCRIPT"
+    chmod +x "$RUNTIME_SCRIPT"
+    
+    # Set VNC password
+    runuser -u "$USER_NAME" -- bash -c "mkdir -p ~/.vnc && vncpasswd -f <<< 'password' > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd"
     
     chown -R "$USER_NAME":"$USER_NAME" /home/"$USER_NAME"/
-    runuser -u "$USER_NAME" -- "$START_SCRIPT" > /dev/null 2>&1 &
+    runuser -u "$USER_NAME" -- "$RUNTIME_SCRIPT" > /dev/null 2>&1 &
 }
 
 # --- Main Entry ---
