@@ -68,22 +68,41 @@ setup_user() {
 setup_vnc_auth() {
     runuser -u "$USER_NAME" -- bash -c "mkdir -p /home/$USER_NAME/.vnc && vncpasswd -f <<< 'password' > /home/$USER_NAME/.vnc/passwd && chmod 600 /home/$USER_NAME/.vnc/passwd"
 }
-
 create_start_script() {
-    cat <<EOF > "$START_SCRIPT"
+    cat <<'EOF' > "$START_SCRIPT"
 #!/bin/bash
+# --- Automated MT5 Provisioning ---
+export DISPLAY=:1
+export USER=abc
+export HOME=/home/abc
+export WINEPREFIX=/home/abc/.wine
+
 pkill -f websockify || true
 vncserver -kill :1 2>/dev/null || true
 rm -rf /tmp/.X11-unix/X1 || true
-vncserver :1 -geometry 1280x720 -depth 24 -SecurityTypes None
+
+vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None
 websockify 3000 --web /usr/share/novnc localhost:5901 &
-export DISPLAY=:1
 openbox-session &
-MT5_PATH="/home/$USER_NAME/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
-if [ -f "\$MT5_PATH" ]; then
-    wine "\$MT5_PATH" &
+
+# Path checked in the standard Wine prefix
+MT5_PATH="/home/abc/.wine/drive_c/Program Files/MetaTrader 5/terminal64.exe"
+
+# If binary is missing, attempt silent install without overwriting existing data
+if [ ! -f "$MT5_PATH" ]; then
+    echo "Binary not found. Preparing Wine environment..."
+    wineboot -u
+    if [ ! -f "/tmp/mt5setup.exe" ]; then
+        wget -q https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe -O /tmp/mt5setup.exe
+    fi
+    echo "Installing MT5 silently..."
+    wine /tmp/mt5setup.exe /auto /silent
 fi
-tail -f /home/$USER_NAME/.vnc/*.log
+
+# Launch MT5
+[ -f "$MT5_PATH" ] && wine "$MT5_PATH" &
+
+tail -f /home/abc/.vnc/*.log
 EOF
     chmod +x "$START_SCRIPT"
 }
