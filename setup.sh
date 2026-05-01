@@ -34,6 +34,7 @@ install_dependencies() {
     
     mkdir -p /usr/share/novnc
     wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz | tar -xz -C /usr/share/novnc --strip-components=1
+    echo "<meta http-equiv=\"refresh\" content=\"0; url=/vnc.html\">" > /usr/share/novnc/index.html
 }
 
 setup_user() {

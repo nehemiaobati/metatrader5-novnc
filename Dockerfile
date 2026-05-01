@@ -18,14 +18,15 @@ RUN dpkg --add-architecture i386 && \
     novnc \
     websockify \
     tigervnc-standalone-server \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    echo "<meta http-equiv=\"refresh\" content=\"0; url=/vnc.html\">" > /usr/share/novnc/index.html
 
 # Create dedicated user
 RUN useradd -m -s /bin/bash abc && \
     echo "abc ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Pre-set VNC password (can be changed)
-RUN sudo -u abc vncpasswd -f <<< "password"
+RUN bash -c 'sudo -u abc vncpasswd -f <<< "password"'
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
