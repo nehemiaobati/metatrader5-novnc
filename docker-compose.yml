@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mt5-vnc
+    container_name: mt5-workbench
     network_mode: host
     restart: unless-stopped
     volumes:
