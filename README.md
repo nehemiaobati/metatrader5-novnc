@@ -51,12 +51,26 @@ Best for environments where you are already inside a basic Ubuntu container.
 To prevent unauthorized access, the VNC server requires a password.
 
 - **Default Password:** `password`
-- **How to Change Password:**
-  To update the VNC password, run the following command (password must be at least 6 characters):
-  ```bash
-  sudo docker exec -u abc mt5-workbench bash -c "printf 'your_new_password\nyour_new_password\n n\n' | vncpasswd"
-  ```
-  *Replace `your_new_password` with your desired password. The `n` at the end skips the view-only password prompt.*
+
+#### **Changing the Password**
+There are two ways to manage the password depending on when you want to change it:
+
+**A. Before Initial Deployment (Setting a Custom Default)**
+If you want a different password from the start, edit `setup.sh` before running it. Find the line containing `vncpasswd -f <<< 'password'` and replace `'password'` with your desired password (minimum 6 characters).
+
+**B. On a Running System (Updating Password)**
+To change the password while the system is active, run:
+```bash
+sudo docker exec -it -u abc mt5-workbench vncpasswd
+```
+
+⚠️ **CRITICAL:** Password changes are **not instant**. The VNC server loads the password into memory at startup. To apply your new password, you **must** restart the VNC session. 
+
+**The simplest way to apply the change is to restart the container:**
+```bash
+sudo docker restart mt5-workbench
+```
+*Once restarted, the VNC server will load the new password from the disk.*
 
 
 ### 3. Streaming Management
