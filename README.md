@@ -52,11 +52,11 @@ To prevent unauthorized access, the VNC server requires a password.
 
 - **Default Password:** `password`
 - **How to Change Password:**
-  If you wish to update the VNC password, run the following command inside the environment:
+  To update the VNC password, run the following command (password must be at least 6 characters):
   ```bash
-  sudo docker exec -u abc mt5-workbench bash -c "vncpasswd -f <<< 'your_new_password'"
+  sudo docker exec -u abc mt5-workbench bash -c "printf 'your_new_password\nyour_new_password\n n\n' | vncpasswd"
   ```
-  *Replace `your_new_password` with your desired password. The change takes effect immediately for new connections.*
+  *Replace `your_new_password` with your desired password. The `n` at the end skips the view-only password prompt.*
 
 
 ### 3. Streaming Management
