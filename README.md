@@ -56,7 +56,11 @@ To prevent unauthorized access, the VNC server requires a password.
 There are two ways to manage the password depending on when you want to change it:
 
 **A. Before Initial Deployment (Setting a Custom Default)**
-If you want a different password from the start, edit `setup.sh` before running it. Find the line containing `vncpasswd -f <<< 'password'` and replace `'password'` with your desired password (minimum 6 characters).
+If you want a different password from the start, you can customize it based on your deployment mode:
+- **Host Mode:** Edit the `Dockerfile`. Find the line `RUN bash -c 'sudo -u abc vncpasswd -f <<< "password"'` and replace `"password"` with your desired password.
+- **Container Mode:** Edit `setup.sh`. Find the line containing `vncpasswd -f <<< 'password'` and replace `'password'` with your desired password.
+
+*(Note: Passwords must be at least 6 characters long.)*
 
 **B. On a Running System (Updating Password)**
 To change the password while the system is active, run:
