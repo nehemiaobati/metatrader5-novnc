@@ -45,7 +45,21 @@ Best for environments where you are already inside a basic Ubuntu container.
 - **Provisioning**: `setup.sh` installs all dependencies (Wine, Xvnc, noVNC) directly into the running container.
 - **Execution**: Launches the services as the user `abc`.
 
-### 2. Streaming Management
+### 2. Access & Security
+
+#### **VNC Authentication**
+To prevent unauthorized access, the VNC server requires a password.
+
+- **Default Password:** `password`
+- **How to Change Password:**
+  If you wish to update the VNC password, run the following command inside the environment:
+  ```bash
+  sudo docker exec -u abc mt5-workbench vncpasswd
+  ```
+  *Follow the on-screen prompts to set your new password. The change takes effect immediately for new connections.*
+
+
+### 3. Streaming Management
 The suite includes a professional streaming module to broadcast your MT5 terminal to YouTube.
 
 **Configuration:**
