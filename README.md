@@ -22,9 +22,7 @@ A standardized, portable, and self-contained environment for MetaTrader 5 automa
 2. **Relative Paths**: `docker-compose.yml` uses relative volume mounts exclusively.
 
 ## Quick Start
-```bash
-make up
-make stream-start
-make backup
-```
+- **Start service**: `make up`
 - **Access VNC**: `http://<server-ip>:3000/vnc.html`
+- **Start Streaming**: `make stream-start`
+- **Backup**: `make backup`
