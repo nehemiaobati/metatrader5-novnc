@@ -26,7 +26,11 @@ vncserver -kill :1 2>/dev/null || true
 rm -rf /tmp/.X11-unix/X1 /tmp/vnc-server-*
 
 # 2. VNC Server: The core display layer
-# Alternative (Insecure): vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes None --I-KNOW-THIS-IS-INSECURE
+log "Initializing VNC password..."
+mkdir -p "$HOME_DIR/.vnc"
+vncpasswd -f <<< "password" > "$HOME_DIR/.vnc/passwd"
+chmod 600 "$HOME_DIR/.vnc/passwd"
+
 log "Starting VNC Server..."
 vncserver :1 -geometry 1280x720 -depth 24 -localhost no -SecurityTypes VncAuth
 
@@ -56,4 +60,7 @@ if [ -f "$MT5_BINARY" ]; then
 fi
 
 log "✅ System Ready. Access via http://<your-ip>:$WEB_PORT/vnc.html"
-tail -f "$HOME_DIR/.vnc/*.log"
+
+# ULTIMATE HEARTBEAT
+# If this still restarts, the container is being killed from the outside (OOM).
+sleep infinity
