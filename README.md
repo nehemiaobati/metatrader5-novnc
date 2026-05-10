@@ -55,6 +55,30 @@ sudo docker restart mt5-workbench
 2. Add your key: `STREAM_KEY=your_youtube_stream_key_here`
 3. Place your background audio at `./volumes/data/audio/BackgroundNocopyright.mp3`.
 
+### Manual Stream Management
+While `make stream-start` is available, for maximum stability and to ensure the stream persists after closing your terminal, use these direct commands:
+
+**Start the Stream**
+Run this exact command to launch the stream in the background:
+```bash
+nohup bash /home/newuser/docker/mt5-workbench/start-stream.sh > /tmp/stream_wrapper.log 2>&1 &
+```
+
+**Stop the Stream**
+To reset or stop the current stream:
+```bash
+bash /home/newuser/docker/mt5-workbench/stop-stream.sh
+```
+
+**Monitor Progress**
+To watch the stream logs in real-time and troubleshoot connectivity:
+```bash
+tail -f /tmp/stream_wrapper.log
+```
+
+⚠️ **CRITICAL**: You must use `nohup` and the trailing `&` symbol. Without them, the process will terminate immediately upon closing the terminal window.
+
+
 ### Troubleshooting
 - **Empty Desktop**: Check logs via `make logs` or `sudo docker exec mt5-workbench tail -f /home/abc/.vnc/*.log`.
 - **Connection Failed**: Ensure port 3000 is open and the container is running.
