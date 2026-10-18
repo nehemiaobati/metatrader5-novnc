@@ -3,15 +3,17 @@
 A standardized, portable, and self-contained environment for MetaTrader 5 automated trading.
 
 ## Project Structure
-Every project must follow this structure to ensure portability:
 
 ```text
-/docker/mt5-workbench/
+mt5-workbench/
 ├── docker-compose.yml       # The immutable source of truth
 ├── Dockerfile               # Build context
-├── .env.template            # Required vars (STREAM_KEY)
+├── .env.template            # Required environment variables (STREAM_KEY)
 ├── Makefile                 # Standardized lifecycle commands
-├── README.md                # Project-specific documentation
+├── README.md                # Operational documentation
+├── start-stream.sh          # Unified streaming engine (RTMP / HLS)
+├── start-stream-hls.sh      # HLS stream wrapper
+├── stop-stream.sh           # Stream cleanup script
 └── volumes/                 # Local persistence
     ├── data/
     │   └── audio/           # Streaming assets
@@ -20,65 +22,107 @@ Every project must follow this structure to ensure portability:
 ```
 
 ## Core Principles
-1. **Absolute Self-Containment**: All data resides in `volumes/`.
-2. **Relative Paths**: `docker-compose.yml` uses relative volume mounts exclusively.
-3. **Lifecycle**: Managed via `Makefile`.
+
+1. **Absolute Self-Containment**: All runtime data resides strictly within `volumes/`.
+2. **Relative Paths**: Configuration uses relative mounts and dynamic script execution to maintain environment portability.
+3. **Lifecycle Management**: Entire container and stream lifecycle is managed deterministically via `Makefile`.
+
+---
 
 ## 🚀 Quick Start
-- `make up`: Start service
-- `http://<server-ip>:3000/vnc.html`: Access VNC
-- `make stream-start`: Start streaming
-- `make stream-stop`: Stop streaming
-- `make backup`: Backup data
+
+- `make up`: Start MT5 workbench container in background
+- `http://<server-ip>:3000/vnc.html`: Access browser VNC (Default password: `password`)
+- `make stream-start`: Start background YouTube RTMP streaming
+- `make stream-start-hls`: Start background YouTube HLS streaming
+- `make stream-stop`: Stop active streaming processes
+- `make backup`: Create timestamped backup archive of `./volumes`
+
+---
 
 ## 📖 Operation Manual
 
 ### VNC Authentication
-The VNC server requires a password to prevent unauthorized access.
+The VNC server requires password authentication to secure the remote desktop.
 - **Default Password**: `password`
 
-### Changing the Password
-You can change the password on a running system:
+#### Updating the Password
+You can update the password inside the running container:
 
 ```bash
 sudo docker exec -it -u abc mt5-workbench vncpasswd
 ```
 
-⚠️ **CRITICAL**: Password changes are not instant. You **must** restart the container for the new password to load from disk:
+Restart the container to load the new credentials:
 
 ```bash
-sudo docker restart mt5-workbench
+make restart
 ```
+
+> **Note**: Your updated password is saved to disk and will persist across container restarts.
+
+---
 
 ### Streaming Setup
-1. Create a `.env` file in the project root.
-2. Add your key: `STREAM_KEY=your_youtube_stream_key_here`
-3. Place your background audio at `./volumes/data/audio/BackgroundNocopyright.mp3`.
 
-### Manual Stream Management
-While `make stream-start` is available, for maximum stability and to ensure the stream persists after closing your terminal, use these direct commands:
+1. Copy the environment template:
+   ```bash
+   cp .env.template .env
+   ```
 
-**Start the Stream**
-Run this exact command to launch the stream in the background:
+2. Add your YouTube Stream Key to `.env`:
+   ```bash
+   STREAM_KEY=xxxx-xxxx-xxxx-xxxx-xxxx
+   ```
+
+3. Place your background audio track at:
+   ```text
+   ./volumes/data/audio/BackgroundNocopyright.mp3
+   ```
+
+---
+
+### Stream Management
+
+#### Starting the Stream
+Streams are launched detached via `nohup` so they persist after disconnecting from your terminal session:
+
+- **RTMP Stream** (Default low latency):
+  ```bash
+  make stream-start
+  ```
+- **HLS Stream** (Enhanced stability / HTTP ingestion):
+  ```bash
+  make stream-start-hls
+  ```
+
+#### Stopping the Stream
+To gracefully terminate the streaming loops and FFmpeg processes:
+
 ```bash
-nohup bash /home/newuser/docker/mt5-workbench/start-stream.sh > /tmp/stream_wrapper.log 2>&1 &
+make stream-stop
 ```
 
-**Stop the Stream**
-To reset or stop the current stream:
-```bash
-bash /home/newuser/docker/mt5-workbench/stop-stream.sh
-```
+#### Monitoring Stream Logs
+Follow the active stream output in real-time:
 
-**Monitor Progress**
-To watch the stream logs in real-time and troubleshoot connectivity:
 ```bash
 tail -f /tmp/stream_wrapper.log
 ```
 
-⚠️ **CRITICAL**: You must use `nohup` and the trailing `&` symbol. Without them, the process will terminate immediately upon closing the terminal window.
+---
 
+### 🔧 Troubleshooting
 
-### Troubleshooting
-- **Empty Desktop**: Check logs via `make logs` or `sudo docker exec mt5-workbench tail -f /home/abc/.vnc/*.log`.
-- **Connection Failed**: Ensure port 3000 is open and the container is running.
+- **Empty Desktop / Display Issues**: Check TigerVNC server logs:
+  ```bash
+  sudo docker exec mt5-workbench tail -f /home/abc/.vnc/*.log
+  ```
+- **Stream Stalling / Restarting**: Inspect the FFmpeg output log:
+  ```bash
+  sudo docker exec mt5-workbench tail -f /tmp/ffmpeg.log
+  ```
+- **Container Connection Issues**: Ensure ports `3000` (noVNC web) and `5901` (VNC core) are accessible and check container status:
+  ```bash
+  make logs
+  ```
