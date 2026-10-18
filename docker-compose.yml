@@ -6,6 +6,10 @@ services:
     container_name: mt5-workbench
     network_mode: host
     restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Africa/Nairobi
     volumes:
       - ./volumes/config/.wine:/home/abc/.wine
       - ./volumes/data/audio:/home/abc/audio
