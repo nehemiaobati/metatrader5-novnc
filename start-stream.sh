@@ -1,65 +1,108 @@
 #!/bin/bash
-# start-stream.sh - RTMP Active Health Check + 12-Hour Rotation
+# ==============================================================================
+# start-stream.sh - Unified YouTube Ingestion Engine (RTMP / HLS)
+# Usage: ./start-stream.sh [--rtmp | --hls] [STREAM_KEY]
+# ==============================================================================
+set -euo pipefail
 
-# Load STREAM_KEY from .env if it exists
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+MODE="rtmp"
+if [[ "${1:-}" == "--hls" ]]; then
+    MODE="hls"
+    shift
+elif [[ "${1:-}" == "--rtmp" ]]; then
+    MODE="rtmp"
+    shift
 fi
 
-STREAM_KEY="${STREAM_KEY:-${1:-zmtb-7xv1-x9jb-bhg8-2rur}}"
+# Locate project root relative to script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
 
-echo "Starting YouTube RTMP stream loop with key: $STREAM_KEY"
+if [ -f "$ENV_FILE" ]; then
+    # Deterministically export non-commented, non-empty environment variables
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+        export "$line"
+    done < "$ENV_FILE"
+fi
 
-# Ensure we aren't already running
-sudo docker exec mt5-workbench pkill -9 -f ffmpeg 2>/dev/null || true
+STREAM_KEY="${1:-${STREAM_KEY:-}}"
+if [ -z "$STREAM_KEY" ]; then
+    echo "❌ ERROR: STREAM_KEY is not defined. Set it in .env or pass as argument." >&2
+    exit 1
+fi
 
-# Infinite loop to keep the stream alive
+echo "Starting YouTube $MODE stream loop with key: ${STREAM_KEY:0:4}****"
+
+stop_ffmpeg() {
+    sudo docker exec mt5-workbench pkill -TERM -f ffmpeg 2>/dev/null || true
+    sleep 2
+    sudo docker exec mt5-workbench pkill -9 -f ffmpeg 2>/dev/null || true
+}
+
+# Ensure no orphan FFmpeg is running
+stop_ffmpeg
+
+MAX_LIFETIME=43200  # Exactly 12 hours in seconds (12 * 60 * 60)
+CHECK_INTERVAL=10
+STALL_TIMEOUT=30
+RESTART_BACKOFF=10
+
 while true; do
-    echo "Launching FFmpeg RTMP ingest..."
-    CMD="sudo docker exec -u abc -d mt5-workbench bash -c \"export DISPLAY=:1 && xhost + && ffmpeg \
-    -f x11grab -framerate 24 -video_size 1280x720 -i :1.0 \
-    -stream_loop -1 -i /home/abc/audio/BackgroundNocopyright.mp3 \
-    -c:v libx264 -preset superfast -tune zerolatency -pix_fmt yuv420p \
-    -b:v 5000k -maxrate 5000k -bufsize 10000k -g 48 \
-    -c:a aac -b:a 128k -ar 44100 \
-    -f flv rtmp://a.rtmp.youtube.com/live2/$STREAM_KEY >>/tmp/ffmpeg.log 2>&1\""
-    
-    eval $CMD
+    echo "Launching FFmpeg $MODE ingest..."
 
-    # --- SESSION TIMER SETUP ---
+    if [ "$MODE" = "hls" ]; then
+        OUTPUT_ARGS=(
+            -f hls -hls_time 2 -hls_list_size 4 -method PUT -http_persistent 1
+            -hls_segment_filename "https://a.upload.youtube.com/http_upload_hls?cid=${STREAM_KEY}&copy=0&file=stream_%05d.ts"
+            "https://a.upload.youtube.com/http_upload_hls?cid=${STREAM_KEY}&copy=0&file=stream.m3u8"
+        )
+    else
+        OUTPUT_ARGS=(
+            -f flv "rtmp://a.rtmp.youtube.com/live2/${STREAM_KEY}"
+        )
+    fi
+
+    # Launch containerized FFmpeg without unsafe eval expansion
+    sudo docker exec -u abc -d mt5-workbench bash -c \
+        "ffmpeg -nostdin \
+        -f x11grab -framerate 24 -video_size 1280x720 -i :1.0 \
+        -stream_loop -1 -i /home/abc/audio/BackgroundNocopyright.mp3 \
+        -c:v libx264 -preset superfast -tune zerolatency -pix_fmt yuv420p \
+        -b:v 5000k -maxrate 5000k -bufsize 10000k -g 48 -flags +cgop \
+        -c:a aac -b:a 128k -ar 44100 \
+        ${OUTPUT_ARGS[*]} > /tmp/ffmpeg.log 2>&1"
+
     START_TIME=$(date +%s)
-    MAX_LIFETIME=3600  # 12 hours in seconds (12 * 60 * 60)
 
-    # --- ACTIVE HEALTH CHECK ---
+    # Active Health Check
     while true; do
-        sleep 10  # Check every 10 seconds as requested
+        sleep "$CHECK_INTERVAL"
         NOW=$(date +%s)
-        
-        # Check 1: 12-Hour Forced Rotation
-        if (( NOW - START_TIME > MAX_LIFETIME )); then
-            echo "🔄 12-Hour Max Session Lifetime reached. Forcing a clean slate restart..."
-            break
-        fi
-        
-        # Check 2: PID Check (Is the process still running?)
-        if ! sudo docker exec mt5-workbench pgrep -f ffmpeg >/dev/null; then
-            echo "⚠️ FFmpeg process died. Triggering restart..."
+
+        # Check 1: 12-Hour Rotation
+        if (( NOW - START_TIME >= MAX_LIFETIME )); then
+            echo "🔄 12-Hour Max Session Lifetime reached. Rotating stream..."
             break
         fi
 
-        # Check 3: Log Heartbeat (Is data actually moving?)
-        # We check if the log file has been modified in the last 30 seconds.
+        # Check 2: Process Vitality
+        if ! sudo docker exec mt5-workbench pgrep -f ffmpeg >/dev/null; then
+            echo "⚠️ FFmpeg process exited unexpectedly. Triggering restart..."
+            break
+        fi
+
+        # Check 3: Log Activity Heartbeat
         LAST_MOD=$(sudo docker exec mt5-workbench stat -c %Y /tmp/ffmpeg.log 2>/dev/null || echo 0)
-        if (( NOW - LAST_MOD > 30 )); then
-            echo "⚠️ Stream stalled (Zombie/Preparing state). Triggering surgical reset..."
+        if (( NOW - LAST_MOD > STALL_TIMEOUT )); then
+            echo "⚠️ Stream output stalled for >${STALL_TIMEOUT}s. Triggering reset..."
             break
         fi
     done
 
-    # Surgical Cleanup: Kill everything to ensure a fresh YouTube handshake
-    echo "Performing total cleanup before restart..."
-    sudo docker exec mt5-workbench pkill -9 -f ffmpeg 2>/dev/null || true
-    
-    echo "Restarting in 10 seconds..."
-    sleep 60
+    echo "Terminating current FFmpeg session..."
+    stop_ffmpeg
+
+    echo "Restarting in ${RESTART_BACKOFF} seconds..."
+    sleep "$RESTART_BACKOFF"
 done
