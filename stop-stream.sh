@@ -1,32 +1,30 @@
 #!/bin/bash
-# stop-stream.sh - Surgical Cleanup
+# ==============================================================================
+# stop-stream.sh - Deterministic Stream Cleanup
+# ==============================================================================
+set -euo pipefail
 
-echo "🛑 Stopping project-specific stream components..."
+echo "🛑 Stopping stream processes..."
 
-# 1. Kill the specific host-side wrapper loops
-# We target the exact filenames found in your directory
-echo "Terminating wrappers..."
-sudo pkill -9 -f "[s]tart-stream.sh" 2>/dev/null || true
-sudo pkill -9 -f "[s]tart-stream-hls.sh" 2>/dev/null || true
+# 1. Terminate host-side wrapper scripts gracefully
+pkill -TERM -f "start-stream(\.sh|-hls\.sh)" 2>/dev/null || true
 
-# 2. Kill FFmpeg inside the specific docker container
-echo "Terminating FFmpeg in container..."
+# 2. Terminate container FFmpeg process (SIGTERM first, then SIGKILL)
+sudo docker exec mt5-workbench pkill -TERM -f ffmpeg 2>/dev/null || true
+sleep 2
 sudo docker exec mt5-workbench pkill -9 -f ffmpeg 2>/dev/null || true
 
-# 3. Final Verification
-echo "Verifying cleanup..."
+# 3. Force kill host wrappers if still lingering
+pkill -9 -f "start-stream(\.sh|-hls\.sh)" 2>/dev/null || true
 
-# Check for the specific wrapper scripts
-WRAPPER_RTMP=$(pgrep -f "start-stream.sh")
-WRAPPER_HLS=$(pgrep -f "start-stream-hls.sh")
-# Check for FFmpeg inside the container
-CONTAINER_FFMPEG=$(sudo docker exec mt5-workbench pgrep -f ffmpeg 2>/dev/null)
+# 4. Verification Check
+WRAPPER_PID=$(pgrep -f "start-stream(\.sh|-hls\.sh)" || true)
+CONTAINER_FFMPEG=$(sudo docker exec mt5-workbench pgrep -f ffmpeg 2>/dev/null || true)
 
-if [ -z "$WRAPPER_RTMP" ] && [ -z "$WRAPPER_HLS" ] && [ -z "$CONTAINER_FFMPEG" ]; then
-  echo "✅ SUCCESS: Project processes stopped. Total Zero reached."
+if [ -z "$WRAPPER_PID" ] && [ -z "$CONTAINER_FFMPEG" ]; then
+    echo "✅ SUCCESS: All stream processes successfully stopped."
 else
-  echo "⚠️ WARNING: Some processes are still lingering."
-  [ ! -z "$WRAPPER_RTMP" ] && echo " -> RTMP Wrapper active (PID: $WRAPPER_RTMP)"
-  [ ! -z "$WRAPPER_HLS" ]  && echo " -> HLS Wrapper active (PID: $WRAPPER_HLS)"
-  [ ! -z "$CONTAINER_FFMPEG" ] && echo " -> FFmpeg active in Docker (PID: $CONTAINER_FFMPEG)"
+    [ -n "$WRAPPER_PID" ] && echo "⚠️ Host wrapper still running (PID: $WRAPPER_PID)"
+    [ -n "$CONTAINER_FFMPEG" ] && echo "⚠️ Container FFmpeg still running (PID: $CONTAINER_FFMPEG)"
+    exit 1
 fi
