@@ -10,8 +10,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Africa/Nairobi
+      - DISPLAY=:1
     volumes:
       - ./volumes/config/.wine:/home/abc/.wine
       - ./volumes/data/audio:/home/abc/audio
-    environment:
-      - DISPLAY=:1
+      
